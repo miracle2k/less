@@ -40,7 +40,9 @@ module Less
             css = Less::Engine.new(File.new(filename), @options).to_css
             client.puts(css)
           rescue
-            client.puts("Error #{$!}\n") 
+            # TODO: We need some way to tell the client about the error; 
+            # maybe a status line.
+            puts "Error #{$!}\n"
           ensure
             client.close()
           end
