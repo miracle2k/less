@@ -1,3 +1,5 @@
+require 'socket'
+
 module Less
   class Command
     attr_accessor :source, :destination, :options
@@ -5,11 +7,14 @@ module Less
     def initialize options
       $verbose = options[:debug]
       @source = options[:source]
-      @destination = (options[:destination] || options[:source]).gsub /\.(less|lss)/, '.css'
+      if not options[:listen]
+        @destination = (options[:destination] || options[:source]).gsub /\.(less|lss)/, '.css'
+      end
       @options = options
       @mutter = Mutter.new.clear
     end
 
+    def listen?()   @options[:listen]   end
     def watch?()    @options[:watch]    end
     def compress?() @options[:compress] end
     def debug?()    @options[:debug]    end
@@ -26,6 +31,21 @@ module Less
     end
 
     def run!
+      if listen?
+        server = TCPServer.new(options[:listen][:host], options[:listen][:port])
+        while (client = server.accept)        
+          begin
+            filename = client.gets.chomp
+            puts "Handling #{filename}"
+            css = Less::Engine.new(File.new(filename), @options).to_css
+            client.puts(css)
+          rescue
+            client.puts("Error #{$!}\n") 
+          ensure
+            client.close()
+          end
+        end
+      end
       if watch?
         parse(true) unless File.exist? @destination
 
@@ -51,7 +71,7 @@ module Less
       end
     end
 
-    def parse new = false
+    def parse new = false 
       begin
         # Create a new Less object with the contents of a file
         css = Less::Engine.new(File.new(@source), @options).to_css
